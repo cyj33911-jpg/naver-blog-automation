@@ -43,15 +43,15 @@ class NaverBlogApp:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # 탭 1: 블로그 자동 발행 (v1)
-        publish_frame = ttk.Frame(self.notebook)
-        self.notebook.add(publish_frame, text=" 블로그 자동 발행 ")
-        self._build_publish_tab(publish_frame)
-
-        # 탭 2: 블로그 초안 생성 (v2)
+        # 탭 1: 블로그 초안 생성 (v2)
         draft_frame = ttk.Frame(self.notebook)
         self.notebook.add(draft_frame, text=" 블로그 초안 생성 ")
         self._build_draft_tab(draft_frame)
+
+        # 탭 2: 블로그 자동 발행 (v1)
+        publish_frame = ttk.Frame(self.notebook)
+        self.notebook.add(publish_frame, text=" 블로그 자동 발행 ")
+        self._build_publish_tab(publish_frame)
 
     # ── 탭 1: 블로그 자동 발행 ──
 
