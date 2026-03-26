@@ -34,34 +34,33 @@ def search_naver_blog(keyword, num=5):
     try:
         resp = requests.get(url, headers=CRAWL_HEADERS, timeout=CRAWL_TIMEOUT)
         resp.raise_for_status()
+        resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "html.parser")
 
+        # blog.naver.com 링크가 포함된 a 태그에서 제목 추출
         results = []
-
-        # 블로그 검색 결과 컨테이너
-        items = soup.select(".api_txt_lines.total_tit")
-        snippets = soup.select(".api_txt_lines.dsc_txt")
-
-        for i, item in enumerate(items[:num]):
-            entry = {
-                "title": item.get_text(strip=True),
-                "url": item.get("href", ""),
-                "snippet": "",
-            }
-            if i < len(snippets):
-                entry["snippet"] = snippets[i].get_text(strip=True)
-            results.append(entry)
-
-        # 결과가 없으면 대체 셀렉터 시도
-        if not results:
-            for item in soup.select(".title_link, .link_tit")[:num]:
+        seen = set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            text = a.get_text(strip=True)
+            if "blog.naver.com" in href and len(text) > 10 and text not in seen:
+                # 광고/네비게이션 링크 제외
+                if "blog.naver.com›" in text:
+                    continue
+                seen.add(text)
                 results.append({
-                    "title": item.get_text(strip=True),
-                    "url": item.get("href", ""),
+                    "title": text,
+                    "url": href,
                     "snippet": "",
                 })
 
-        return results
+        # 본문 스니펫 매칭 (.desc_wrap)
+        snippets = [d.get_text(strip=True) for d in soup.select(".desc_wrap")]
+        for i, entry in enumerate(results):
+            if i < len(snippets):
+                entry["snippet"] = snippets[i]
+
+        return results[:num]
 
     except Exception as e:
         print(f"[크롤링 오류] 블로그 검색 실패: {e}")
@@ -69,85 +68,60 @@ def search_naver_blog(keyword, num=5):
 
 
 def search_naver_shopping(keyword, num=5):
-    """네이버 쇼핑 검색 결과 크롤링
+    """네이버 통합검색 내 쇼핑 영역에서 상품 정보 크롤링
 
     Returns:
         list[dict]: [{"title": ..., "price": ..., "url": ..., "mall": ...}, ...]
     """
     encoded = urllib.parse.quote(keyword)
-    url = f"https://search.shopping.naver.com/search/all?query={encoded}"
+    # 통합검색에서 쇼핑 정보 추출 (쇼핑 전용 페이지는 JS 렌더링 필요)
+    url = f"https://search.naver.com/search.naver?query={encoded}"
 
     try:
         resp = requests.get(url, headers=CRAWL_HEADERS, timeout=CRAWL_TIMEOUT)
         resp.raise_for_status()
+        resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "html.parser")
 
         results = []
 
-        # 쇼핑 상품 목록
-        items = soup.select(".product_item, .basicList_item__0T9JD")
+        # 쇼핑 영역의 상품 아이템
+        items = soup.select("[class*='product_item'], [class*='shop_list'] li, [class*='lst_total'] li")
         for item in items[:num]:
-            title_el = item.select_one(
-                ".product_title, .basicList_title__VfX3c, a[class*='title']"
-            )
-            price_el = item.select_one(
-                ".product_num, .price_num__S2p_v, [class*='price']"
-            )
+            title_el = item.select_one("[class*='tit'], a[title]")
+            price_el = item.select_one("[class*='price'], [class*='prc']")
             link_el = item.select_one("a[href]")
-            mall_el = item.select_one(
-                ".product_mall, .basicList_mall__O2yNt, [class*='mall']"
-            )
+            mall_el = item.select_one("[class*='mall'], [class*='name']")
 
-            results.append({
-                "title": title_el.get_text(strip=True) if title_el else "",
-                "price": price_el.get_text(strip=True) if price_el else "",
-                "url": link_el["href"] if link_el else "",
-                "mall": mall_el.get_text(strip=True) if mall_el else "",
-            })
+            title = ""
+            if title_el:
+                title = title_el.get("title", "") or title_el.get_text(strip=True)
 
-        # JSON 데이터 추출 시도 (SSR 데이터)
+            if title and len(title) > 3:
+                results.append({
+                    "title": title,
+                    "price": price_el.get_text(strip=True) if price_el else "",
+                    "url": link_el["href"] if link_el else "",
+                    "mall": mall_el.get_text(strip=True) if mall_el else "",
+                })
+
+        # 결과 부족 시 쇼핑 링크에서 추가 추출
         if not results:
-            results = _extract_shopping_json(soup, num)
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
+                text = a.get_text(strip=True)
+                if ("shopping" in href or "shop" in href) and len(text) > 5:
+                    results.append({
+                        "title": text,
+                        "price": "",
+                        "url": href,
+                        "mall": "",
+                    })
+                if len(results) >= num:
+                    break
 
-        return results
+        return results[:num]
 
     except Exception as e:
         print(f"[크롤링 오류] 쇼핑 검색 실패: {e}")
         return []
-
-
-def _extract_shopping_json(soup, num):
-    """페이지 내 <script> 태그에서 SSR JSON 데이터 추출 시도"""
-    import json
-
-    results = []
-    for script in soup.select("script"):
-        text = script.string or ""
-        if "products" not in text and "items" not in text:
-            continue
-        try:
-            # __NEXT_DATA__ 패턴
-            if "__NEXT_DATA__" in text:
-                start = text.index("{")
-                data = json.loads(text[start:])
-                products = (
-                    data.get("props", {})
-                    .get("pageProps", {})
-                    .get("initialState", {})
-                    .get("products", {})
-                    .get("list", [])
-                )
-                for p in products[:num]:
-                    item = p.get("item", p)
-                    results.append({
-                        "title": item.get("productTitle", ""),
-                        "price": item.get("price", ""),
-                        "url": item.get("mallProductUrl", ""),
-                        "mall": item.get("mallName", ""),
-                    })
-                if results:
-                    break
-        except (json.JSONDecodeError, ValueError, KeyError):
-            continue
-
-    return results

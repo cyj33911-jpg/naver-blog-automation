@@ -453,6 +453,8 @@ class NaverBlogApp:
                 self._draft_log(f"  이미지 {len(image_paths)}장 포함")
                 self._draft_log(f"{'='*50}")
                 self._draft_log(f"\n[안내] '블로그 자동 발행' 탭에서 이 디렉토리를 선택하면 바로 발행할 수 있습니다.")
+                # 프리뷰 표시
+                self._show_preview(filepath)
             else:
                 self._draft_log("[오류] 초안 생성 실패.")
 
@@ -461,3 +463,37 @@ class NaverBlogApp:
         finally:
             self.is_generating = False
             self.root.after(0, lambda: self.generate_btn.config(state=tk.NORMAL))
+
+    def _show_preview(self, filepath):
+        """생성된 초안을 프리뷰 창으로 표시"""
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            return
+
+        def _open():
+            preview = tk.Toplevel(self.root)
+            preview.title(f"초안 프리뷰 - {os.path.basename(filepath)}")
+            preview.geometry("600x500")
+
+            text = scrolledtext.ScrolledText(
+                preview, wrap=tk.WORD, font=("맑은 고딕", 10),
+            )
+            text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            text.insert(tk.END, content)
+            text.config(state=tk.DISABLED)
+
+            btn_frame = ttk.Frame(preview)
+            btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+            ttk.Button(
+                btn_frame, text="파일 위치 열기",
+                command=lambda: os.startfile(os.path.dirname(filepath)),
+            ).pack(side=tk.LEFT, padx=(0, 5))
+
+            ttk.Button(
+                btn_frame, text="닫기", command=preview.destroy,
+            ).pack(side=tk.RIGHT)
+
+        self.root.after(0, _open)
