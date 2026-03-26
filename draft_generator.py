@@ -1,9 +1,9 @@
-# draft_generator.py - Claude API로 블로그 초안(TXT) 생성
+# draft_generator.py - Gemini API로 블로그 초안(TXT) 생성
 
 import os
-import anthropic
+import google.generativeai as genai
 
-from config import CLAUDE_MODEL
+from config import GEMINI_MODEL
 
 
 def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir):
@@ -15,7 +15,7 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
         본문 (중간에 [사진N] 파일명 포함)
 
     Args:
-        api_key: Anthropic API 키
+        api_key: Google Gemini API 키
         product_info: image_analyzer에서 반환된 제품 정보 dict
         crawled_data: naver_crawler에서 반환된 {"blog": [...], "shopping": [...]}
         image_paths: 사용자가 선택한 이미지 파일 경로 리스트
@@ -24,18 +24,13 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
     Returns:
         str: 생성된 TXT 파일 경로. 실패 시 None
     """
-    client = anthropic.Anthropic(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(GEMINI_MODEL)
 
-    # 프롬프트 구성
     prompt = _build_prompt(product_info, crawled_data, image_paths)
 
-    response = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    draft_text = response.content[0].text
+    response = model.generate_content(prompt)
+    draft_text = response.text
 
     # TXT 파일 저장
     product_name = product_info.get("제품명", "제품").replace("/", "_").replace("\\", "_")
@@ -52,7 +47,7 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
 
 
 def _build_prompt(product_info, crawled_data, image_paths):
-    """Claude API에 보낼 프롬프트를 구성한다."""
+    """Gemini API에 보낼 프롬프트를 구성한다."""
 
     # 이미지 파일명 목록
     image_filenames = [os.path.basename(p) for p in image_paths]

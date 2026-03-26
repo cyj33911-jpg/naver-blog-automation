@@ -106,7 +106,7 @@ class NaverBlogApp:
         api_frame = ttk.LabelFrame(parent, text="API 설정", padding=10)
         api_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
 
-        ttk.Label(api_frame, text="Anthropic API Key:").grid(row=0, column=0, sticky=tk.W, pady=3)
+        ttk.Label(api_frame, text="Gemini API Key:").grid(row=0, column=0, sticky=tk.W, pady=3)
         self.api_key_entry = ttk.Entry(api_frame, width=50, show="*")
         self.api_key_entry.grid(row=0, column=1, padx=(5, 0), pady=3)
 

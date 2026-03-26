@@ -1,6 +1,7 @@
 selenium
 webdriver-manager
 pyautogui
-anthropic
+google-generativeai
+Pillow
 requests
 beautifulsoup4

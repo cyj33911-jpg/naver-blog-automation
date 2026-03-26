@@ -80,8 +80,8 @@ MANUAL_LOGIN_WAIT = 120
 import os
 API_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_key.txt")
 
-# Claude API 모델
-CLAUDE_MODEL = "claude-sonnet-4-6"
+# Gemini API 모델
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # 크롤링 설정
 CRAWL_TIMEOUT = 10
