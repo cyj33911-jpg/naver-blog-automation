@@ -3,5 +3,6 @@ __pycache__/
 chrome_profile/
 account.txt
 api_key.txt
+tone_profile.json
 .venv/
 node_modules/

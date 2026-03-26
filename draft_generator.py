@@ -50,14 +50,20 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir,
 
 def _build_prompt(product_info, crawled_data, image_paths, author_profile=None):
     """Gemini API에 보낼 프롬프트를 구성한다."""
+    from tone_cloner import load_tone, get_tone_prompt
+
     if author_profile is None:
         author_profile = {"gender": "여성", "age": "30대"}
 
     gender = author_profile.get("gender", "여성")
     age = author_profile.get("age", "30대")
 
-    # 성별/연령대별 톤 가이드
-    tone_guide = _get_tone_guide(gender, age)
+    # 클론된 톤이 있으면 우선 사용, 없으면 기본 프로필
+    cloned_tone = load_tone()
+    if cloned_tone:
+        tone_guide = get_tone_prompt(cloned_tone)
+    else:
+        tone_guide = _get_tone_guide(gender, age)
 
     # 이미지 파일명 목록
     image_filenames = [os.path.basename(p) for p in image_paths]
@@ -85,10 +91,12 @@ def _build_prompt(product_info, crawled_data, image_paths, author_profile=None):
     if not shopping_info:
         shopping_info = "  (검색 결과 없음)\n"
 
+    tone_source = "클론된 블로그 톤" if cloned_tone else f"{age} {gender} 프로필"
+
     prompt = f"""당신은 네이버 블로그 전문 작가입니다.
 당신은 {age} {gender} 블로거로서 글을 작성합니다.
 
-## 글쓰기 톤 & 스타일
+## 글쓰기 톤 & 스타일 ({tone_source})
 {tone_guide}
 
 아래 제품 정보와 참고 자료를 바탕으로 위 톤에 맞는 블로그 글을 작성해주세요.

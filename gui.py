@@ -158,6 +158,33 @@ class NaverBlogApp:
         )
         age_combo.grid(row=0, column=3, padx=(5, 0), pady=3, sticky=tk.W)
 
+        # 톤 클론
+        tone_frame = ttk.LabelFrame(parent, text="블로그 톤 클론 (선택)", padding=10)
+        tone_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        tone_input_frame = ttk.Frame(tone_frame)
+        tone_input_frame.pack(fill=tk.X)
+
+        ttk.Label(tone_input_frame, text="블로그 ID:").pack(side=tk.LEFT)
+        self.tone_blog_entry = ttk.Entry(tone_input_frame, width=25)
+        self.tone_blog_entry.pack(side=tk.LEFT, padx=(5, 5))
+
+        self.tone_analyze_btn = ttk.Button(
+            tone_input_frame, text="톤 분석", command=self._on_analyze_tone,
+        )
+        self.tone_analyze_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.tone_clear_btn = ttk.Button(
+            tone_input_frame, text="톤 해제", command=self._on_clear_tone, width=8,
+        )
+        self.tone_clear_btn.pack(side=tk.LEFT)
+
+        self.tone_status = ttk.Label(tone_frame, text="톤 미설정 (기본 프로필 사용)", foreground="gray")
+        self.tone_status.pack(anchor=tk.W, pady=(5, 0))
+
+        # 저장된 톤 로드
+        self._load_saved_tone()
+
         # 생성 버튼
         gen_btn_frame = ttk.Frame(parent)
         gen_btn_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -356,6 +383,99 @@ class NaverBlogApp:
             self.is_running = False
             self.root.after(0, lambda: self.upload_btn.config(state=tk.NORMAL))
             self.root.after(0, lambda: self.stop_btn.config(state=tk.DISABLED))
+
+    # ──────────────────────────────────────────────
+    #  탭 2: 톤 클론
+    # ──────────────────────────────────────────────
+
+    def _load_saved_tone(self):
+        """저장된 톤 프로필이 있으면 상태 표시"""
+        from tone_cloner import load_tone
+        tone = load_tone()
+        if tone and tone.get("전체 톤 요약"):
+            self.tone_status.config(
+                text=f"적용 중: {tone['전체 톤 요약'][:50]}...",
+                foreground="green",
+            )
+
+    def _on_analyze_tone(self):
+        """톤 분석 버튼 클릭"""
+        api_key = self.api_key_entry.get().strip()
+        blog_id = self.tone_blog_entry.get().strip()
+
+        if not api_key:
+            self._draft_log("[오류] Gemini API Key를 입력해주세요.")
+            return
+        if not blog_id:
+            self._draft_log("[오류] 톤을 복사할 블로그 ID를 입력해주세요.")
+            return
+
+        # URL 입력 시 ID만 추출
+        if "blog.naver.com/" in blog_id:
+            blog_id = blog_id.rstrip("/").split("blog.naver.com/")[-1]
+            blog_id = blog_id.split("/")[0].split("?")[0]
+
+        self.tone_analyze_btn.config(state=tk.DISABLED)
+        self.tone_status.config(text="톤 분석 중...", foreground="orange")
+
+        thread = threading.Thread(
+            target=self._run_tone_analysis,
+            args=(api_key, blog_id),
+            daemon=True,
+        )
+        thread.start()
+
+    def _run_tone_analysis(self, api_key, blog_id):
+        """톤 분석 실행 (별도 스레드)"""
+        from tone_cloner import crawl_blog_posts, analyze_tone, save_tone
+
+        try:
+            self._draft_log(f"\n[톤 분석] 블로그 '{blog_id}'의 최근 글 수집 중...")
+            posts = crawl_blog_posts(blog_id, num=5)
+
+            if not posts:
+                self._draft_log("[오류] 블로그 글을 가져올 수 없습니다. 블로그 ID를 확인해주세요.")
+                self.root.after(0, lambda: self.tone_status.config(
+                    text="톤 미설정 (기본 프로필 사용)", foreground="gray"))
+                return
+
+            self._draft_log(f"  {len(posts)}개의 글 수집 완료")
+            for p in posts:
+                self._draft_log(f"    - {p['title'][:40]}")
+
+            self._draft_log("[톤 분석] Gemini가 톤을 분석 중...")
+            tone_data = analyze_tone(api_key, posts)
+
+            if not tone_data:
+                self._draft_log("[오류] 톤 분석 실패.")
+                return
+
+            save_tone(tone_data)
+
+            summary = tone_data.get("전체 톤 요약", "분석 완료")
+            self._draft_log(f"\n[톤 분석 완료]")
+            for key, value in tone_data.items():
+                if key != "raw":
+                    self._draft_log(f"  {key}: {value}")
+
+            self.root.after(0, lambda: self.tone_status.config(
+                text=f"적용 중: {summary[:50]}...", foreground="green"))
+
+        except Exception as e:
+            self._draft_log(f"[오류] 톤 분석 실패: {e}")
+            self.root.after(0, lambda: self.tone_status.config(
+                text="톤 미설정 (기본 프로필 사용)", foreground="gray"))
+        finally:
+            self.root.after(0, lambda: self.tone_analyze_btn.config(state=tk.NORMAL))
+
+    def _on_clear_tone(self):
+        """톤 해제"""
+        import os as _os
+        from tone_cloner import TONE_FILE
+        if _os.path.exists(TONE_FILE):
+            _os.remove(TONE_FILE)
+        self.tone_status.config(text="톤 미설정 (기본 프로필 사용)", foreground="gray")
+        self._draft_log("[톤] 클론된 톤이 해제되었습니다. 기본 프로필을 사용합니다.")
 
     # ──────────────────────────────────────────────
     #  탭 2: 블로그 초안 생성 이벤트
