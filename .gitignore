@@ -4,5 +4,6 @@ chrome_profile/
 account.txt
 api_key.txt
 tone_profile.json
+custom_templates.json
 .venv/
 node_modules/

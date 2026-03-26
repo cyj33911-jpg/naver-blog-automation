@@ -118,14 +118,25 @@ class NaverBlogApp:
         self.product_name_entry = ttk.Entry(product_frame, width=40)
         self.product_name_entry.grid(row=0, column=1, padx=(5, 0), pady=3)
 
-        from templates import TEMPLATE_NAMES
+        from templates import get_all_template_names
         ttk.Label(product_frame, text="템플릿:").grid(row=1, column=0, sticky=tk.W, pady=3)
         self.template_var = tk.StringVar(value="자유형")
-        template_combo = ttk.Combobox(
-            product_frame, textvariable=self.template_var, width=38,
-            values=TEMPLATE_NAMES, state="readonly",
+        self.template_combo = ttk.Combobox(
+            product_frame, textvariable=self.template_var, width=25,
+            values=get_all_template_names(), state="readonly",
         )
-        template_combo.grid(row=1, column=1, padx=(5, 0), pady=3, sticky=tk.W)
+        self.template_combo.grid(row=1, column=1, padx=(5, 0), pady=3, sticky=tk.W)
+
+        template_btn_frame = ttk.Frame(product_frame)
+        template_btn_frame.grid(row=1, column=2, padx=(5, 0), sticky=tk.W)
+        ttk.Button(
+            template_btn_frame, text="+추가", width=6,
+            command=self._on_add_template,
+        ).pack(side=tk.LEFT, padx=(0, 3))
+        ttk.Button(
+            template_btn_frame, text="관리", width=5,
+            command=self._on_manage_templates,
+        ).pack(side=tk.LEFT)
 
         # 이미지 선택
         img_frame = ttk.LabelFrame(parent, text="제품 이미지", padding=10)
@@ -485,6 +496,97 @@ class NaverBlogApp:
             _os.remove(TONE_FILE)
         self.tone_status.config(text="톤 미설정 (기본 프로필 사용)", foreground="gray")
         self._draft_log("[톤] 클론된 톤이 해제되었습니다. 기본 프로필을 사용합니다.")
+
+    # ──────────────────────────────────────────────
+    #  탭 2: 커스텀 템플릿
+    # ──────────────────────────────────────────────
+
+    def _refresh_template_list(self):
+        """템플릿 드롭다운 갱신"""
+        from templates import get_all_template_names
+        self.template_combo["values"] = get_all_template_names()
+
+    def _on_add_template(self):
+        """커스텀 템플릿 추가 다이얼로그"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("커스텀 템플릿 추가")
+        dialog.geometry("550x450")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="템플릿 이름:").pack(anchor=tk.W, padx=10, pady=(10, 0))
+        name_entry = ttk.Entry(dialog, width=50)
+        name_entry.pack(fill=tk.X, padx=10, pady=(0, 5))
+
+        ttk.Label(dialog, text="템플릿 구조 (붙여넣기 가능):").pack(anchor=tk.W, padx=10)
+        text_area = scrolledtext.ScrolledText(
+            dialog, wrap=tk.WORD, font=("맑은 고딕", 9), height=15,
+        )
+        text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 5))
+
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        def _save():
+            name = name_entry.get().strip()
+            structure = text_area.get("1.0", tk.END).strip()
+            if not name:
+                self._draft_log("[오류] 템플릿 이름을 입력해주세요.")
+                return
+            if not structure:
+                self._draft_log("[오류] 템플릿 내용을 입력해주세요.")
+                return
+            from templates import add_custom_template
+            add_custom_template(name, structure)
+            self._refresh_template_list()
+            self.template_var.set(f"[커스텀] {name}")
+            self._draft_log(f"[템플릿] '{name}' 커스텀 템플릿이 추가되었습니다.")
+            dialog.destroy()
+
+        ttk.Button(btn_frame, text="저장", command=_save).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="취소", command=dialog.destroy).pack(side=tk.RIGHT)
+
+    def _on_manage_templates(self):
+        """커스텀 템플릿 관리 다이얼로그"""
+        from templates import load_custom_templates, delete_custom_template
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("커스텀 템플릿 관리")
+        dialog.geometry("400x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        custom = load_custom_templates()
+        if not custom:
+            ttk.Label(dialog, text="저장된 커스텀 템플릿이 없습니다.").pack(pady=20)
+            ttk.Button(dialog, text="닫기", command=dialog.destroy).pack()
+            return
+
+        ttk.Label(dialog, text="커스텀 템플릿 목록 (선택 후 삭제 가능):").pack(
+            anchor=tk.W, padx=10, pady=(10, 5))
+
+        listbox = tk.Listbox(dialog, font=("맑은 고딕", 10))
+        listbox.pack(fill=tk.BOTH, expand=True, padx=10)
+        for name in custom:
+            listbox.insert(tk.END, name)
+
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        def _delete():
+            sel = listbox.curselection()
+            if not sel:
+                return
+            name = listbox.get(sel[0])
+            delete_custom_template(name)
+            listbox.delete(sel[0])
+            self._refresh_template_list()
+            if self.template_var.get() == f"[커스텀] {name}":
+                self.template_var.set("자유형")
+            self._draft_log(f"[템플릿] '{name}' 커스텀 템플릿이 삭제되었습니다.")
+
+        ttk.Button(btn_frame, text="선택 삭제", command=_delete).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="닫기", command=dialog.destroy).pack(side=tk.RIGHT)
 
     # ──────────────────────────────────────────────
     #  탭 2: 블로그 초안 생성 이벤트
