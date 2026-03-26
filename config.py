@@ -73,3 +73,23 @@ SELECTORS = {
 
 # 수동 로그인 대기 시간 (초) - 캡차/2차 인증 대응
 MANUAL_LOGIN_WAIT = 120
+
+# --- v2: 블로그 초안 생성 설정 ---
+
+# API 키 파일 경로 (프로그램과 같은 디렉토리)
+import os
+API_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_key.txt")
+
+# Claude API 모델
+CLAUDE_MODEL = "claude-sonnet-4-6"
+
+# 크롤링 설정
+CRAWL_TIMEOUT = 10
+CRAWL_BLOG_COUNT = 5
+CRAWL_SHOPPING_COUNT = 5
+
+# HTTP 요청 헤더
+CRAWL_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+}
