@@ -115,8 +115,17 @@ class NaverBlogApp:
         product_frame.pack(fill=tk.X, padx=10, pady=5)
 
         ttk.Label(product_frame, text="제품명:").grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.product_name_entry = ttk.Entry(product_frame, width=50)
+        self.product_name_entry = ttk.Entry(product_frame, width=40)
         self.product_name_entry.grid(row=0, column=1, padx=(5, 0), pady=3)
+
+        from templates import TEMPLATE_NAMES
+        ttk.Label(product_frame, text="템플릿:").grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.template_var = tk.StringVar(value="자유형")
+        template_combo = ttk.Combobox(
+            product_frame, textvariable=self.template_var, width=38,
+            values=TEMPLATE_NAMES, state="readonly",
+        )
+        template_combo.grid(row=1, column=1, padx=(5, 0), pady=3, sticky=tk.W)
 
         # 이미지 선택
         img_frame = ttk.LabelFrame(parent, text="제품 이미지", padding=10)
@@ -530,15 +539,16 @@ class NaverBlogApp:
 
         gender = self.gender_var.get()
         age = self.age_var.get()
+        template = self.template_var.get()
 
         thread = threading.Thread(
             target=self._run_draft_generation,
-            args=(api_key, product_name, list(self.selected_images), output_dir, gender, age),
+            args=(api_key, product_name, list(self.selected_images), output_dir, gender, age, template),
             daemon=True,
         )
         thread.start()
 
-    def _run_draft_generation(self, api_key, product_name, image_paths, output_dir, gender, age):
+    def _run_draft_generation(self, api_key, product_name, image_paths, output_dir, gender, age, template="자유형"):
         """초안 생성 작업 실행 (별도 스레드)"""
         from naver_crawler import crawl_product_info
         from draft_generator import generate_draft
@@ -558,12 +568,12 @@ class NaverBlogApp:
             self._draft_log(f"  쇼핑 결과: {shop_count}건")
 
             # 3단계: 초안 생성
-            self._draft_log(f"\n[3/3] 블로그 초안 생성 중... (작성자: {age} {gender})")
-            self._draft_log(f"  [참고] 크롤링 데이터 + 제품명 기반으로 Gemini가 초안을 작성합니다.")
+            template_label = f", 템플릿: {template}" if template != "자유형" else ""
+            self._draft_log(f"\n[3/3] 블로그 초안 생성 중... (작성자: {age} {gender}{template_label})")
             author_profile = {"gender": gender, "age": age}
             filepath = generate_draft(
                 api_key, product_info, crawled_data, image_paths, output_dir,
-                author_profile=author_profile,
+                author_profile=author_profile, template_name=template,
             )
 
             if filepath:

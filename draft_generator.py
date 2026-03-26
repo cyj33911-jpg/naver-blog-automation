@@ -7,7 +7,7 @@ from config import GEMINI_MODEL
 
 
 def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir,
-                   author_profile=None):
+                   author_profile=None, template_name="자유형"):
     """제품 정보 + 크롤링 데이터를 바탕으로 블로그 초안 TXT를 생성한다.
 
     생성되는 TXT는 v1 자동 발행 형식과 호환된다:
@@ -29,7 +29,7 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir,
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(GEMINI_MODEL)
 
-    prompt = _build_prompt(product_info, crawled_data, image_paths, author_profile)
+    prompt = _build_prompt(product_info, crawled_data, image_paths, author_profile, template_name)
 
     response = model.generate_content(prompt)
     draft_text = response.text
@@ -48,9 +48,10 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir,
     return filepath
 
 
-def _build_prompt(product_info, crawled_data, image_paths, author_profile=None):
+def _build_prompt(product_info, crawled_data, image_paths, author_profile=None, template_name="자유형"):
     """Gemini API에 보낼 프롬프트를 구성한다."""
     from tone_cloner import load_tone, get_tone_prompt
+    from templates import get_template_prompt
 
     if author_profile is None:
         author_profile = {"gender": "여성", "age": "30대"}
@@ -92,13 +93,14 @@ def _build_prompt(product_info, crawled_data, image_paths, author_profile=None):
         shopping_info = "  (검색 결과 없음)\n"
 
     tone_source = "클론된 블로그 톤" if cloned_tone else f"{age} {gender} 프로필"
+    template_prompt = get_template_prompt(template_name)
 
     prompt = f"""당신은 네이버 블로그 전문 작가입니다.
 당신은 {age} {gender} 블로거로서 글을 작성합니다.
 
 ## 글쓰기 톤 & 스타일 ({tone_source})
 {tone_guide}
-
+{"## 글 템플릿: " + template_name + chr(10) + template_prompt + chr(10) if template_prompt else ""}
 아래 제품 정보와 참고 자료를 바탕으로 위 톤에 맞는 블로그 글을 작성해주세요.
 
 ## 제품 정보
