@@ -130,6 +130,26 @@ class NaverBlogApp:
         self.img_listbox = tk.Listbox(img_frame, height=4, font=("Consolas", 9))
         self.img_listbox.pack(fill=tk.X, pady=(5, 0))
 
+        # 블로그 작성자 프로필
+        profile_frame = ttk.LabelFrame(parent, text="작성자 프로필", padding=10)
+        profile_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(profile_frame, text="성별:").grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.gender_var = tk.StringVar(value="여성")
+        gender_combo = ttk.Combobox(
+            profile_frame, textvariable=self.gender_var, width=10,
+            values=["여성", "남성"], state="readonly",
+        )
+        gender_combo.grid(row=0, column=1, padx=(5, 20), pady=3, sticky=tk.W)
+
+        ttk.Label(profile_frame, text="연령대:").grid(row=0, column=2, sticky=tk.W, pady=3)
+        self.age_var = tk.StringVar(value="30대")
+        age_combo = ttk.Combobox(
+            profile_frame, textvariable=self.age_var, width=10,
+            values=["10대", "20대", "30대", "40대", "50대", "60대 이상"], state="readonly",
+        )
+        age_combo.grid(row=0, column=3, padx=(5, 0), pady=3, sticky=tk.W)
+
         # 생성 버튼
         gen_btn_frame = ttk.Frame(parent)
         gen_btn_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -359,7 +379,7 @@ class NaverBlogApp:
         """초안 생성 버튼 클릭"""
         api_key = self.api_key_entry.get().strip()
         if not api_key:
-            self._draft_log("[오류] Anthropic API Key를 입력해주세요.")
+            self._draft_log("[오류] Gemini API Key를 입력해주세요.")
             return
         if not self.selected_images:
             self._draft_log("[오류] 이미지를 1개 이상 선택해주세요.")
@@ -376,14 +396,17 @@ class NaverBlogApp:
         self.is_generating = True
         self.generate_btn.config(state=tk.DISABLED)
 
+        gender = self.gender_var.get()
+        age = self.age_var.get()
+
         thread = threading.Thread(
             target=self._run_draft_generation,
-            args=(api_key, list(self.selected_images), output_dir),
+            args=(api_key, list(self.selected_images), output_dir, gender, age),
             daemon=True,
         )
         thread.start()
 
-    def _run_draft_generation(self, api_key, image_paths, output_dir):
+    def _run_draft_generation(self, api_key, image_paths, output_dir, gender, age):
         """초안 생성 작업 실행 (별도 스레드)"""
         from image_analyzer import analyze_product_image
         from naver_crawler import crawl_product_info
@@ -416,9 +439,11 @@ class NaverBlogApp:
             self._draft_log(f"  쇼핑 결과: {shop_count}건")
 
             # 3단계: 초안 생성
-            self._draft_log(f"\n[3/3] 블로그 초안 생성 중...")
+            self._draft_log(f"\n[3/3] 블로그 초안 생성 중... (작성자: {age} {gender})")
+            author_profile = {"gender": gender, "age": age}
             filepath = generate_draft(
                 api_key, product_info, crawled_data, image_paths, output_dir,
+                author_profile=author_profile,
             )
 
             if filepath:

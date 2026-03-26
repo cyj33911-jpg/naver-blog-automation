@@ -6,7 +6,8 @@ import google.generativeai as genai
 from config import GEMINI_MODEL
 
 
-def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir):
+def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir,
+                   author_profile=None):
     """제품 정보 + 크롤링 데이터를 바탕으로 블로그 초안 TXT를 생성한다.
 
     생성되는 TXT는 v1 자동 발행 형식과 호환된다:
@@ -20,6 +21,7 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
         crawled_data: naver_crawler에서 반환된 {"blog": [...], "shopping": [...]}
         image_paths: 사용자가 선택한 이미지 파일 경로 리스트
         output_dir: TXT 저장 디렉토리
+        author_profile: {"gender": "여성/남성", "age": "30대"} 작성자 프로필
 
     Returns:
         str: 생성된 TXT 파일 경로. 실패 시 None
@@ -27,7 +29,7 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(GEMINI_MODEL)
 
-    prompt = _build_prompt(product_info, crawled_data, image_paths)
+    prompt = _build_prompt(product_info, crawled_data, image_paths, author_profile)
 
     response = model.generate_content(prompt)
     draft_text = response.text
@@ -46,8 +48,16 @@ def generate_draft(api_key, product_info, crawled_data, image_paths, output_dir)
     return filepath
 
 
-def _build_prompt(product_info, crawled_data, image_paths):
+def _build_prompt(product_info, crawled_data, image_paths, author_profile=None):
     """Gemini API에 보낼 프롬프트를 구성한다."""
+    if author_profile is None:
+        author_profile = {"gender": "여성", "age": "30대"}
+
+    gender = author_profile.get("gender", "여성")
+    age = author_profile.get("age", "30대")
+
+    # 성별/연령대별 톤 가이드
+    tone_guide = _get_tone_guide(gender, age)
 
     # 이미지 파일명 목록
     image_filenames = [os.path.basename(p) for p in image_paths]
@@ -76,7 +86,12 @@ def _build_prompt(product_info, crawled_data, image_paths):
         shopping_info = "  (검색 결과 없음)\n"
 
     prompt = f"""당신은 네이버 블로그 전문 작가입니다.
-아래 제품 정보와 참고 자료를 바탕으로 자연스러운 블로그 글을 작성해주세요.
+당신은 {age} {gender} 블로거로서 글을 작성합니다.
+
+## 글쓰기 톤 & 스타일
+{tone_guide}
+
+아래 제품 정보와 참고 자료를 바탕으로 위 톤에 맞는 블로그 글을 작성해주세요.
 
 ## 제품 정보
 - 제품명: {product_info.get('제품명', '알 수 없음')}
@@ -118,6 +133,31 @@ def _build_prompt(product_info, crawled_data, image_paths):
 가격도 합리적이라 추천드립니다.
 """
     return prompt
+
+
+def _get_tone_guide(gender, age):
+    """성별과 연령대에 따른 블로그 톤 가이드를 반환한다."""
+    tone = ""
+
+    # 연령대별 기본 톤
+    age_tones = {
+        "10대": "활발하고 트렌디한 말투. 줄임말이나 유행어를 자연스럽게 섞어 사용. 이모티콘 느낌의 표현(ㅎㅎ, ㅋㅋ) 적극 활용. 솔직하고 꾸밈없는 후기 스타일.",
+        "20대": "밝고 캐주얼한 말투. 공감을 이끄는 표현 사용. 트렌드에 민감하고 가성비/가심비를 중시하는 시각. '~했어요', '~인 것 같아요' 같은 부드러운 어미.",
+        "30대": "신뢰감 있으면서도 친근한 말투. 실용적인 정보 위주로 꼼꼼하게 분석. 가격 대비 성능, 실사용 경험을 구체적으로 전달. 적당히 격식을 갖춘 '~합니다/~해요' 체.",
+        "40대": "차분하고 경험에서 우러나는 신뢰감 있는 말투. 비교 분석과 장단점을 명확히 정리. 가족이나 실생활에서의 활용도 중심. 정돈된 문장과 깔끔한 구성.",
+        "50대": "진솔하고 따뜻한 말투. 오랜 경험에서 나오는 깊이 있는 관점. 건강, 실용성, 내구성을 중시하는 시각. 정중하고 격식 있는 '~합니다' 체.",
+        "60대 이상": "정감 있고 다정한 말투. 삶의 지혜가 묻어나는 서술. 편안하고 읽기 쉬운 문장. 실용적인 가치와 품질을 중시. 격식체 사용.",
+    }
+
+    # 성별별 뉘앙스
+    gender_tones = {
+        "여성": "감성적이고 디테일한 묘사. 색감, 질감, 분위기 등 감각적 표현 활용. 공감과 추천 포인트를 자연스럽게 녹여내기.",
+        "남성": "간결하고 핵심 위주의 서술. 스펙, 성능, 효율성 중심의 분석적 시각. 객관적 데이터와 비교를 활용한 설득력 있는 글.",
+    }
+
+    tone += age_tones.get(age, age_tones["30대"]) + "\n"
+    tone += gender_tones.get(gender, gender_tones["여성"])
+    return tone
 
 
 def _copy_images_if_needed(image_paths, output_dir):
