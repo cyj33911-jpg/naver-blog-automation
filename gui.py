@@ -474,7 +474,7 @@ class NaverBlogApp:
 
         def _open():
             preview = tk.Toplevel(self.root)
-            preview.title(f"초안 프리뷰 - {os.path.basename(filepath)}")
+            preview.title(f"초안 편집 - {os.path.basename(filepath)}")
             preview.geometry("600x500")
 
             text = scrolledtext.ScrolledText(
@@ -482,10 +482,20 @@ class NaverBlogApp:
             )
             text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
             text.insert(tk.END, content)
-            text.config(state=tk.DISABLED)
 
             btn_frame = ttk.Frame(preview)
             btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+            def _save():
+                new_content = text.get("1.0", tk.END).rstrip("\n")
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                self._draft_log(f"[저장] 초안이 저장되었습니다: {filepath}")
+                preview.title(f"초안 편집 - {os.path.basename(filepath)} (저장됨)")
+
+            ttk.Button(
+                btn_frame, text="저장", command=_save,
+            ).pack(side=tk.LEFT, padx=(0, 5))
 
             ttk.Button(
                 btn_frame, text="파일 위치 열기",
