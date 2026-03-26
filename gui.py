@@ -430,7 +430,7 @@ class NaverBlogApp:
 
             # 2단계: 네이버 크롤링
             self._draft_log(f"\n[2/2] 네이버 검색 크롤링 중: '{product_name}'")
-            crawled_data = crawl_product_info(keyword)
+            crawled_data = crawl_product_info(product_name)
 
             blog_count = len(crawled_data.get("blog", []))
             shop_count = len(crawled_data.get("shopping", []))
