@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+chrome_profile/
+account.txt
+.venv/
+node_modules/
