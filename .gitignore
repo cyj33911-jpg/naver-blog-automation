@@ -7,3 +7,14 @@ tone_profile.json
 custom_templates.json
 .venv/
 node_modules/
+
+# 미디어 파일 (각 PC에서 로컬 보관)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.mp4
+*.mov
+*.avi

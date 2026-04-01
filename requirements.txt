@@ -5,3 +5,4 @@ google-generativeai
 Pillow
 requests
 beautifulsoup4
+customtkinter>=5.2.0
