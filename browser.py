@@ -33,22 +33,20 @@ class NaverBlogBrowser:
         try:
             service = Service(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
+            # 자동화 감지 우회 (Chrome 146 호환: experimental_option 대신 argument 사용)
             options.add_argument("--disable-blink-features=AutomationControlled")
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option("useAutomationExtension", False)
             options.add_argument("--disable-notifications")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--remote-debugging-port=0")
+            options.add_argument("--password-store=basic")
+            options.add_argument("--use-mock-keychain")
 
-            # 크롬 프로필 저장 (로그인 세션 유지)
-            profile_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chrome_profile")
+            # 크롬 프로필 저장 (로그인 세션 유지) — 공백 없는 경로 사용
+            profile_dir = os.path.join(os.path.expanduser("~"), "naver_blog_chrome_profile")
+            os.makedirs(profile_dir, exist_ok=True)
             options.add_argument(f"--user-data-dir={profile_dir}")
-
-            # 비밀번호 저장 팝업 비활성화
-            prefs = {
-                "credentials_enable_service": False,
-                "profile.password_manager_enabled": False,
-                "profile.password_manager_leak_detection": False,
-            }
-            options.add_experimental_option("prefs", prefs)
 
             self.driver = webdriver.Chrome(service=service, options=options)
             self.driver.implicitly_wait(5)
